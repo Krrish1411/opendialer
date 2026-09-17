@@ -16,9 +16,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.CallMade
-import androidx.compose.material.icons.automirrored.filled.CallMissed
-import androidx.compose.material.icons.automirrored.filled.CallReceived
+import androidx.compose.material.icons.filled.CallMade
+import androidx.compose.material.icons.filled.CallMissed
+import androidx.compose.material.icons.filled.CallReceived
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.MoreVert
@@ -175,11 +175,11 @@ fun CallLogItem(
                     modifier = Modifier.padding(top = 2.dp)
                 ) {
                     val (icon, tint) = when (log.callType) {
-                        CallType.INCOMING -> Pair(Icons.AutoMirrored.Filled.CallReceived, Color(0xFF10B981))
-                        CallType.OUTGOING -> Pair(Icons.AutoMirrored.Filled.CallMade, Color(0xFF3B82F6))
-                        CallType.MISSED -> Pair(Icons.AutoMirrored.Filled.CallMissed, MaterialTheme.colorScheme.error)
+                        CallType.INCOMING -> Pair(Icons.Default.CallReceived, Color(0xFF10B981))
+                        CallType.OUTGOING -> Pair(Icons.Default.CallMade, Color(0xFF3B82F6))
+                        CallType.MISSED -> Pair(Icons.Default.CallMissed, MaterialTheme.colorScheme.error)
                         CallType.BLOCKED -> Pair(Icons.Default.Block, MaterialTheme.colorScheme.error)
-                        CallType.REJECTED -> Pair(Icons.AutoMirrored.Filled.CallMissed, Color(0xFFF59E0B))
+                        CallType.REJECTED -> Pair(Icons.Default.CallMissed, Color(0xFFF59E0B))
                     }
 
                     Icon(
