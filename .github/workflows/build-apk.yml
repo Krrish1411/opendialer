@@ -24,7 +24,9 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -36,12 +38,13 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'opendialer' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'opendialer123' }}
         run: |
+          mkdir -p app
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "Decoding secret keystore from GitHub Secrets..."
             echo "$KEYSTORE_BASE64" | base64 --decode > app/release.keystore
-          else
+          elif [ ! -f "app/release.keystore" ]; then
             echo "Generating consistent deterministic release keystore for seamless in-place updates..."
-            keytool -genkey -v -keystore app/release.keystore \
+            keytool -genkeypair -v -keystore app/release.keystore \
               -alias opendialer \
               -keyalg RSA -keysize 2048 -validity 10000 \
               -storepass opendialer123 -keypass opendialer123 \
