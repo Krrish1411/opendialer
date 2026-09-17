@@ -133,7 +133,7 @@ fun KeypadScreen(
                     ) {
                         items(recentCalls) { call ->
                             RecentCallQuickRow(
-                                name = call.cachedName.ifEmpty { call.number },
+                                name = call.contactName?.ifEmpty { call.number } ?: call.number,
                                 number = call.number,
                                 onClick = { viewModel.placeCall(context, call.number) }
                             )

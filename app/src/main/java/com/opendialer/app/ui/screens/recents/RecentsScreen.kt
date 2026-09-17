@@ -126,6 +126,7 @@ fun CallLogItem(
     onBlockClick: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Surface(
         modifier = Modifier

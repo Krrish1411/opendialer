@@ -196,7 +196,8 @@ class SettingsViewModel @Inject constructor(
                 blockedNumberDao.blockNumber(
                     BlockedNumberEntity(
                         normalizedNumber = normalized,
-                        callerName = name
+                        rawNumber = number,
+                        contactName = name
                     )
                 )
             }

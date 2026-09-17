@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -112,7 +113,7 @@ fun BlockedNumbersScreen(
                     contentPadding = PaddingValues(bottom = 80.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(blockedNumbers, key = { it.id }) { item ->
+                    items(blockedNumbers, key = { it.normalizedNumber }) { item ->
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
@@ -128,7 +129,7 @@ fun BlockedNumbersScreen(
                                 Spacer(modifier = Modifier.width(14.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = item.callerName?.ifEmpty { item.normalizedNumber } ?: item.normalizedNumber,
+                                        text = item.contactName?.ifEmpty { item.rawNumber } ?: item.rawNumber,
                                         fontWeight = FontWeight.SemiBold,
                                         fontSize = 15.sp
                                     )

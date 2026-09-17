@@ -171,7 +171,7 @@ class CallManager @Inject constructor(
 
         // Check carrier ViLTE capability
         val canVideo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            primary.details?.hasCapability(Call.Details.CAPABILITY_SUPPORTS_VT_LOCAL_BIDIRECTIONAL) == true
+            primary.details?.can(Call.Details.CAPABILITY_SUPPORTS_VT_LOCAL_BIDIRECTIONAL) == true
         } else false
 
         val isVideo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -299,7 +299,7 @@ class CallManager @Inject constructor(
         val confCalls = primary.conferenceableCalls
         if (confCalls.isNotEmpty()) {
             primary.conference(confCalls.first())
-        } else if (primary.details?.hasCapability(Call.Details.CAPABILITY_MERGE_CONFERENCE) == true) {
+        } else if (primary.details?.can(Call.Details.CAPABILITY_MERGE_CONFERENCE) == true) {
             primary.mergeConference()
         } else {
             val other = calls.firstOrNull { it != primary }
