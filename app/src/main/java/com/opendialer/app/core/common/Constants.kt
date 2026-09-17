@@ -1,7 +1,7 @@
 package com.opendialer.app.core.common
 
 object Constants {
-    const val GITHUB_OWNER = "opendialer"
+    const val GITHUB_OWNER = "Krrish1411"
     const val GITHUB_REPO = "opendialer"
     const val GITHUB_API_LATEST_RELEASE = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
 

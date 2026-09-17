@@ -58,8 +58,8 @@ This repository comes pre-configured with a GitHub Actions CI/CD pipeline (`.git
 ### How to Create the GitHub Repository & Push:
 
 ```bash
-# 1. Initialize remote (replace your-username with your GitHub handle)
-git remote add origin https://github.com/your-username/opendialer.git
+# 1. Initialize remote
+git remote add origin https://github.com/Krrish1411/opendialer.git
 
 # 2. Add and commit all files
 git add .
@@ -69,7 +69,7 @@ git commit -m "Initial commit: OpenDialer flagship release"
 git push -u origin main
 ```
 
-Once pushed, go to `https://github.com/your-username/opendialer/actions` and download your freshly compiled APK!
+Once pushed, go to `https://github.com/Krrish1411/opendialer/actions` and download your freshly compiled APK!
 
 ---
 
