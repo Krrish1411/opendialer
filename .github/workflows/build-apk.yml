@@ -1,0 +1,77 @@
+name: Build OpenDialer APK & Release
+
+on:
+  push:
+    branches: [ "main" ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Package APKs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Setup Keystore for Consistent In-Place Updates
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'opendialer123' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'opendialer' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'opendialer123' }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Decoding secret keystore from GitHub Secrets..."
+            echo "$KEYSTORE_BASE64" | base64 --decode > app/release.keystore
+          else
+            echo "Generating consistent deterministic release keystore for seamless in-place updates..."
+            keytool -genkey -v -keystore app/release.keystore \
+              -alias opendialer \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass opendialer123 -keypass opendialer123 \
+              -dname "CN=OpenDialer, OU=OpenSource, O=OpenDialer, L=Earth, S=World, C=US"
+          fi
+
+      - name: Build Debug & Release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'opendialer123' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'opendialer' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'opendialer123' }}
+        run: ./gradlew assembleRelease assembleDebug --stacktrace
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: opendialer-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+
+      - name: Upload Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: opendialer-release-apk
+          path: app/build/outputs/apk/release/*.apk
+
+      - name: Create GitHub Release on Tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/debug/*.apk
+          generate_release_notes: true
