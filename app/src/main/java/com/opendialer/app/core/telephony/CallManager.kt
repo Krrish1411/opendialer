@@ -7,11 +7,13 @@ import android.os.Handler
 import android.os.Looper
 import android.telecom.Call
 import android.telecom.CallAudioState
-import com.opendialer.app.core.common.PhoneNumberUtils
+import android.telecom.InCallService
+import android.telecom.VideoProfile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.concurrent.CopyOnWriteArrayList
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,17 +33,28 @@ data class CurrentCallInfo(
     val durationSeconds: Long = 0,
     val isMuted: Boolean = false,
     val isSpeakerOn: Boolean = false,
+    val audioRoute: Int = CallAudioState.ROUTE_EARPIECE,
     val isHeld: Boolean = false,
     val isRecording: Boolean = false,
-    val simSlotIndex: Int = 0
+    val simSlotIndex: Int = 0,
+    val isVideoCapable: Boolean = false,
+    val isVideoCall: Boolean = false,
+    // Multi-call & Call Waiting
+    val hasSecondaryCall: Boolean = false,
+    val secondaryPhoneNumber: String = "",
+    val secondaryDisplayName: String = "",
+    val secondaryIsHeld: Boolean = false,
+    val waitingCallNumber: String = "",
+    val waitingCallName: String = "",
+    val isConference: Boolean = false
 )
 
 @Singleton
 class CallManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-
-    private var currentCall: Call? = null
+    var inCallService: InCallService? = null
+    private val calls = CopyOnWriteArrayList<Call>()
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
 
     private val _callState = MutableStateFlow(CurrentCallInfo())
@@ -52,8 +65,9 @@ class CallManager @Inject constructor(
 
     private val timerRunnable = object : Runnable {
         override fun run() {
-            if (currentCall != null && _callState.value.state == DialerCallState.ACTIVE) {
-                val duration = (System.currentTimeMillis() - callStartTime) / 1000
+            val primary = getPrimaryCall()
+            if (primary != null && primary.state == Call.STATE_ACTIVE) {
+                val duration = if (callStartTime > 0) (System.currentTimeMillis() - callStartTime) / 1000 else 0
                 _callState.value = _callState.value.copy(durationSeconds = duration)
                 handler.postDelayed(this, 1000)
             }
@@ -62,7 +76,40 @@ class CallManager @Inject constructor(
 
     private val callCallback = object : Call.Callback() {
         override fun onStateChanged(call: Call, state: Int) {
-            updateFromCall(call)
+            updateCallsState()
+        }
+
+        override fun onDetailsChanged(call: Call, details: Call.Details) {
+            updateCallsState()
+        }
+
+        override fun onConferenceableCallsChanged(call: Call, conferenceableCalls: MutableList<Call>) {
+            updateCallsState()
+        }
+    }
+
+    fun onCallAdded(call: Call) {
+        if (!calls.contains(call)) {
+            calls.add(call)
+            call.registerCallback(callCallback)
+        }
+        updateCallsState()
+    }
+
+    fun onCallRemoved(call: Call) {
+        call.unregisterCallback(callCallback)
+        calls.remove(call)
+        if (calls.isEmpty()) {
+            handler.removeCallbacks(timerRunnable)
+            callStartTime = 0
+            _callState.value = CurrentCallInfo(state = DialerCallState.DISCONNECTED)
+            handler.postDelayed({
+                if (calls.isEmpty()) {
+                    _callState.value = CurrentCallInfo(state = DialerCallState.IDLE)
+                }
+            }, 1500)
+        } else {
+            updateCallsState()
         }
     }
 
@@ -70,39 +117,49 @@ class CallManager @Inject constructor(
         val isSpeaker = audioState.route == CallAudioState.ROUTE_SPEAKER
         _callState.value = _callState.value.copy(
             isMuted = audioState.isMuted,
-            isSpeakerOn = isSpeaker
+            isSpeakerOn = isSpeaker,
+            audioRoute = audioState.route
         )
     }
 
-    fun onCallAdded(call: Call) {
-        currentCall = call
-        call.registerCallback(callCallback)
-        updateFromCall(call)
+    fun getPrimaryCall(): Call? {
+        return calls.firstOrNull { it.state == Call.STATE_ACTIVE }
+            ?: calls.firstOrNull { it.state == Call.STATE_RINGING }
+            ?: calls.firstOrNull { it.state == Call.STATE_DIALING || it.state == Call.STATE_CONNECTING }
+            ?: calls.firstOrNull { it.state == Call.STATE_HOLDING }
+            ?: calls.firstOrNull()
     }
 
-    fun onCallRemoved(call: Call) {
-        if (currentCall == call) {
-            call.unregisterCallback(callCallback)
-            currentCall = null
-            handler.removeCallbacks(timerRunnable)
-            _callState.value = CurrentCallInfo(state = DialerCallState.DISCONNECTED)
+    fun getHoldingCall(): Call? {
+        val primary = getPrimaryCall()
+        return calls.firstOrNull { it != primary && it.state == Call.STATE_HOLDING }
+    }
 
-            handler.postDelayed({
+    fun getWaitingCall(): Call? {
+        val primary = getPrimaryCall()
+        return calls.firstOrNull { it != primary && it.state == Call.STATE_RINGING }
+    }
+
+    private fun updateCallsState() {
+        val primary = getPrimaryCall()
+        if (primary == null) {
+            if (_callState.value.state != DialerCallState.DISCONNECTED) {
                 _callState.value = CurrentCallInfo(state = DialerCallState.IDLE)
-            }, 2000)
+            }
+            return
         }
-    }
 
-    private fun updateFromCall(call: Call) {
-        val number = call.details?.handle?.schemeSpecificPart ?: ""
-        val callerName = call.details?.callerDisplayName ?: ""
+        val number = primary.details?.handle?.schemeSpecificPart ?: ""
+        val callerName = primary.details?.callerDisplayName ?: ""
+        val isConference = primary.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) == true
 
-        val newState = when (call.state) {
+        val newState = when (primary.state) {
             Call.STATE_RINGING -> DialerCallState.INCOMING
             Call.STATE_DIALING, Call.STATE_CONNECTING -> DialerCallState.OUTGOING
             Call.STATE_ACTIVE -> {
                 if (callStartTime == 0L) {
-                    callStartTime = System.currentTimeMillis()
+                    val connectTime = primary.details?.connectTimeMillis ?: 0L
+                    callStartTime = if (connectTime > 0) connectTime else System.currentTimeMillis()
                     handler.post(timerRunnable)
                 }
                 DialerCallState.ACTIVE
@@ -112,27 +169,72 @@ class CallManager @Inject constructor(
             else -> DialerCallState.IDLE
         }
 
+        // Check carrier ViLTE capability
+        val canVideo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            primary.details?.hasCapability(Call.Details.CAPABILITY_SUPPORTS_VT_LOCAL_BIDIRECTIONAL) == true
+        } else false
+
+        val isVideo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            VideoProfile.isVideo(primary.details?.videoState ?: VideoProfile.STATE_AUDIO_ONLY)
+        } else false
+
+        // Check secondary holding call & waiting call
+        val holding = getHoldingCall()
+        val waiting = getWaitingCall()
+
+        val secondaryNum = holding?.details?.handle?.schemeSpecificPart ?: ""
+        val secondaryName = holding?.details?.callerDisplayName ?: secondaryNum
+
+        val waitingNum = waiting?.details?.handle?.schemeSpecificPart ?: ""
+        val waitingName = waiting?.details?.callerDisplayName ?: waitingNum
+
         _callState.value = _callState.value.copy(
             state = newState,
             phoneNumber = number,
-            displayName = callerName.ifEmpty { number }
+            displayName = callerName.ifEmpty { number },
+            isHeld = primary.state == Call.STATE_HOLDING,
+            isVideoCapable = canVideo,
+            isVideoCall = isVideo,
+            isConference = isConference,
+            hasSecondaryCall = holding != null,
+            secondaryPhoneNumber = secondaryNum,
+            secondaryDisplayName = secondaryName,
+            secondaryIsHeld = true,
+            waitingCallNumber = waitingNum,
+            waitingCallName = waitingName
         )
     }
 
+    // Call Actions
     fun answer() {
-        currentCall?.answer(0)
+        getPrimaryCall()?.answer(VideoProfile.STATE_AUDIO_ONLY)
     }
 
-    fun reject() {
-        currentCall?.reject(false, null)
+    fun answerWithVideo() {
+        getPrimaryCall()?.answer(VideoProfile.STATE_BIDIRECTIONAL)
+    }
+
+    fun reject(rejectWithMessage: Boolean = false, textMessage: String? = null) {
+        val ringing = calls.firstOrNull { it.state == Call.STATE_RINGING } ?: getPrimaryCall()
+        if (ringing != null) {
+            if (rejectWithMessage && textMessage != null) {
+                ringing.reject(true, textMessage)
+            } else {
+                ringing.reject(false, null)
+            }
+        }
     }
 
     fun disconnect() {
-        currentCall?.disconnect()
+        val active = getPrimaryCall()
+        active?.disconnect() ?: run {
+            calls.forEach { it.disconnect() }
+        }
     }
 
     fun toggleMute() {
         val newMute = !_callState.value.isMuted
+        inCallService?.setMuted(newMute)
         audioManager?.isMicrophoneMute = newMute
         _callState.value = _callState.value.copy(isMuted = newMute)
     }
@@ -143,24 +245,75 @@ class CallManager @Inject constructor(
         } else {
             CallAudioState.ROUTE_SPEAKER
         }
-        audioManager?.isSpeakerphoneOn = !_callState.value.isSpeakerOn
-        _callState.value = _callState.value.copy(isSpeakerOn = !_callState.value.isSpeakerOn)
+        setAudioRoute(targetRoute)
+    }
+
+    fun setAudioRoute(route: Int) {
+        inCallService?.setAudioRoute(route)
+        val isSpeaker = route == CallAudioState.ROUTE_SPEAKER
+        audioManager?.isSpeakerphoneOn = isSpeaker
+        _callState.value = _callState.value.copy(
+            isSpeakerOn = isSpeaker,
+            audioRoute = route
+        )
     }
 
     fun toggleHold() {
-        currentCall?.let {
-            if (it.state == Call.STATE_HOLDING) {
-                it.unhold()
-            } else {
-                it.hold()
+        val call = getPrimaryCall() ?: return
+        if (call.state == Call.STATE_HOLDING) {
+            call.unhold()
+        } else if (call.state == Call.STATE_ACTIVE) {
+            call.hold()
+        }
+    }
+
+    // Multi-Call / Call Waiting Actions
+    fun holdAndAnswer() {
+        val waiting = getWaitingCall() ?: return
+        val active = calls.firstOrNull { it.state == Call.STATE_ACTIVE }
+        active?.hold()
+        waiting.answer(VideoProfile.STATE_AUDIO_ONLY)
+    }
+
+    fun endAndAnswer() {
+        val waiting = getWaitingCall() ?: return
+        val active = calls.firstOrNull { it.state == Call.STATE_ACTIVE }
+        active?.disconnect()
+        waiting.answer(VideoProfile.STATE_AUDIO_ONLY)
+    }
+
+    fun declineSecondCall() {
+        val waiting = getWaitingCall() ?: return
+        waiting.reject(false, null)
+    }
+
+    fun swap() {
+        val holding = getHoldingCall()
+        val active = calls.firstOrNull { it.state == Call.STATE_ACTIVE }
+        active?.hold()
+        holding?.unhold()
+    }
+
+    fun mergeConference() {
+        val primary = getPrimaryCall() ?: return
+        val confCalls = primary.conferenceableCalls
+        if (confCalls.isNotEmpty()) {
+            primary.conference(confCalls.first())
+        } else if (primary.details?.hasCapability(Call.Details.CAPABILITY_MERGE_CONFERENCE) == true) {
+            primary.mergeConference()
+        } else {
+            val other = calls.firstOrNull { it != primary }
+            if (other != null) {
+                primary.conference(other)
             }
         }
     }
 
     fun playDtmf(digit: Char) {
-        currentCall?.playDtmfTone(digit)
+        val primary = getPrimaryCall()
+        primary?.playDtmfTone(digit)
         handler.postDelayed({
-            currentCall?.stopDtmfTone()
+            primary?.stopDtmfTone()
         }, 150)
     }
 

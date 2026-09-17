@@ -2,10 +2,13 @@ package com.opendialer.app.core.telephony
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
+import android.telecom.VideoProfile
 import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
 import androidx.core.content.ContextCompat
@@ -114,6 +117,37 @@ class SimManager @Inject constructor(
                     preferredSlotIndex = slotIndex
                 )
             )
+        }
+    }
+
+    fun placeCall(context: Context, targetNumber: String, isVideoCall: Boolean = false, slotIndex: Int? = null) {
+        val cleanNumber = targetNumber.trim()
+        if (cleanNumber.isBlank()) return
+
+        val activeSims = getActiveSims()
+        val chosenSim = if (slotIndex != null) {
+            activeSims.find { it.slotIndex == slotIndex } ?: activeSims.firstOrNull()
+        } else {
+            activeSims.firstOrNull()
+        }
+
+        try {
+            val uri = Uri.parse("tel:" + Uri.encode(cleanNumber))
+            val intent = Intent(Intent.ACTION_CALL, uri).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                if (chosenSim?.phoneAccountHandle != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    putExtra(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, chosenSim.phoneAccountHandle)
+                }
+                if (isVideoCall && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    putExtra(TelecomManager.EXTRA_START_CALL_WITH_VIDEO_STATE, VideoProfile.STATE_BIDIRECTIONAL)
+                }
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(cleanNumber))).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(dialIntent)
         }
     }
 }

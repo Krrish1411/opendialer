@@ -9,7 +9,6 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,7 +21,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.opendialer.app.ui.permissions.DefaultDialerPromptBanner
+import com.opendialer.app.core.designsystem.components.OpenDialerTopBar
 import com.opendialer.app.ui.permissions.PermissionUtils
 import com.opendialer.app.ui.screens.contacts.ContactsScreen
 import com.opendialer.app.ui.screens.contacts.ContactsViewModel
@@ -34,6 +33,7 @@ import com.opendialer.app.ui.screens.recents.RecentsScreen
 import com.opendialer.app.ui.screens.recents.RecentsViewModel
 import com.opendialer.app.ui.screens.recordings.RecordingsScreen
 import com.opendialer.app.ui.screens.recordings.RecordingsViewModel
+import com.opendialer.app.ui.screens.settings.BlockedNumbersScreen
 import com.opendialer.app.ui.screens.settings.CallForwardingScreen
 import com.opendialer.app.ui.screens.settings.CheckUpdateScreen
 import com.opendialer.app.ui.screens.settings.DndSettingsScreen
@@ -41,6 +41,7 @@ import com.opendialer.app.ui.screens.settings.DualSimSettingsScreen
 import com.opendialer.app.ui.screens.settings.RecordingSettingsScreen
 import com.opendialer.app.ui.screens.settings.SettingsScreen
 import com.opendialer.app.ui.screens.settings.SettingsViewModel
+import com.opendialer.app.ui.screens.settings.SoundsSettingsScreen
 import com.opendialer.app.ui.screens.settings.ThemeSettingsScreen
 
 @Composable
@@ -55,18 +56,33 @@ fun AppNavigation(
     var isDefaultDialer by remember { mutableStateOf(PermissionUtils.isDefaultDialer(context)) }
 
     val tabs = listOf(
-        MainTab.FAVORITES,
+        MainTab.KEYPAD,
         MainTab.RECENTS,
         MainTab.CONTACTS,
-        MainTab.KEYPAD,
-        MainTab.RECORDINGS,
-        MainTab.SETTINGS
+        MainTab.FAVORITES
     )
 
     val isTopLevelDestination = tabs.any { it.route == currentRoute }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        topBar = {
+            if (isTopLevelDestination) {
+                val title = when (currentRoute) {
+                    MainTab.KEYPAD.route -> "Phone"
+                    MainTab.RECENTS.route -> "Recents"
+                    MainTab.CONTACTS.route -> "Contacts"
+                    MainTab.FAVORITES.route -> "Favorites"
+                    else -> "OpenDialer"
+                }
+                OpenDialerTopBar(
+                    title = title,
+                    onNavigateToSettings = { navController.navigate("tab_settings") },
+                    onNavigateToRecordings = { navController.navigate("tab_recordings") },
+                    onNavigateToSpeedDial = { navController.navigate(MainTab.FAVORITES.route) }
+                )
+            }
+        },
         bottomBar = {
             if (isTopLevelDestination) {
                 NavigationBar {
@@ -96,9 +112,9 @@ fun AppNavigation(
                 navController = navController,
                 startDestination = MainTab.KEYPAD.route
             ) {
-                composable(MainTab.FAVORITES.route) {
-                    val viewModel = hiltViewModel<FavoritesViewModel>()
-                    FavoritesScreen(viewModel = viewModel)
+                composable(MainTab.KEYPAD.route) {
+                    val viewModel = hiltViewModel<KeypadViewModel>()
+                    KeypadScreen(viewModel = viewModel)
                 }
                 composable(MainTab.RECENTS.route) {
                     val viewModel = hiltViewModel<RecentsViewModel>()
@@ -108,24 +124,36 @@ fun AppNavigation(
                     val viewModel = hiltViewModel<ContactsViewModel>()
                     ContactsScreen(viewModel = viewModel)
                 }
-                composable(MainTab.KEYPAD.route) {
-                    val viewModel = hiltViewModel<KeypadViewModel>()
-                    KeypadScreen(viewModel = viewModel)
+                composable(MainTab.FAVORITES.route) {
+                    val viewModel = hiltViewModel<FavoritesViewModel>()
+                    FavoritesScreen(viewModel = viewModel)
                 }
-                composable(MainTab.RECORDINGS.route) {
+
+                // Top-Level menu destinations
+                composable("tab_recordings") {
                     val viewModel = hiltViewModel<RecordingsViewModel>()
                     RecordingsScreen(viewModel = viewModel)
                 }
-                composable(MainTab.SETTINGS.route) {
+                composable("tab_settings") {
                     val settingsVm = hiltViewModel<SettingsViewModel>()
                     SettingsScreen(
                         onNavigateToThemes = { navController.navigate("settings_theme") },
                         onNavigateToDualSim = { navController.navigate("settings_dualsim") },
+                        onNavigateToSounds = { navController.navigate("settings_sounds") },
+                        onNavigateToBlockedNumbers = { navController.navigate("settings_blocked") },
                         onNavigateToRecording = { navController.navigate("settings_recording") },
                         onNavigateToForwarding = { navController.navigate("settings_forwarding") },
                         onNavigateToDnd = { navController.navigate("settings_dnd") },
                         onNavigateToUpdates = { navController.navigate("settings_updates") }
                     )
+                }
+
+                composable("settings_sounds") {
+                    SoundsSettingsScreen()
+                }
+                composable("settings_blocked") {
+                    val viewModel = hiltViewModel<SettingsViewModel>()
+                    BlockedNumbersScreen(viewModel = viewModel)
                 }
 
                 // Sub-Settings Routes

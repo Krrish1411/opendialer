@@ -20,36 +20,68 @@ object PhoneNumberUtils {
         }
     }
 
-    private val t9Map = mapOf(
-        '2' to listOf('a', 'b', 'c'),
-        '3' to listOf('d', 'e', 'f'),
-        '4' to listOf('g', 'h', 'i'),
-        '5' to listOf('j', 'k', 'l'),
-        '6' to listOf('m', 'n', 'o'),
-        '7' to listOf('p', 'q', 'r', 's'),
-        '8' to listOf('t', 'u', 'v'),
-        '9' to listOf('w', 'x', 'y', 'z')
+    private val charToT9Digit = mapOf(
+        'a' to '2', 'b' to '2', 'c' to '2',
+        'd' to '3', 'e' to '3', 'f' to '3',
+        'g' to '4', 'h' to '4', 'i' to '4',
+        'j' to '5', 'k' to '5', 'l' to '5',
+        'm' to '6', 'n' to '6', 'o' to '6',
+        'p' to '7', 'q' to '7', 'r' to '7', 's' to '7',
+        't' to '8', 'u' to '8', 'v' to '8',
+        'w' to '9', 'x' to '9', 'y' to '9', 'z' to '9'
     )
 
-    fun matchesT9(queryDigits: String, contactName: String): Boolean {
-        if (queryDigits.isEmpty()) return true
-        val cleanName = contactName.lowercase(Locale.getDefault())
-        val nameWords = cleanName.split("\\s+".toRegex())
-
-        // Check if query matches beginning of full name or any word in name
-        for (word in nameWords) {
-            if (matchesWordPrefix(queryDigits, word)) return true
+    fun nameToT9(name: String): String {
+        val sb = StringBuilder(name.length)
+        for (ch in name.lowercase(Locale.getDefault())) {
+            val digit = charToT9Digit[ch]
+            if (digit != null) {
+                sb.append(digit)
+            } else if (ch.isWhitespace()) {
+                sb.append(' ')
+            }
         }
-        return false
+        return sb.toString()
     }
 
-    private fun matchesWordPrefix(digits: String, word: String): Boolean {
-        if (digits.length > word.length) return false
-        for (i in digits.indices) {
-            val digit = digits[i]
-            val validChars = t9Map[digit] ?: return false
-            if (word[i] !in validChars) return false
+    /**
+     * Matches T9 query against contact name or number.
+     * Returns a score: > 0 for match (higher score = better match), 0 for no match.
+     */
+    fun matchScoreT9(queryDigits: String, contactName: String, phoneNumber: String): Int {
+        if (queryDigits.isEmpty()) return 100
+
+        val normalizedPhone = normalize(phoneNumber)
+        val cleanName = contactName.lowercase(Locale.getDefault()).trim()
+        val t9Name = nameToT9(cleanName)
+
+        // 1. Phone number match
+        if (normalizedPhone.contains(queryDigits)) {
+            return if (normalizedPhone.startsWith(queryDigits)) 90 else 50
         }
-        return true
+
+        if (t9Name.isEmpty()) return 0
+
+        // 2. Direct name match (e.g. name starts with query)
+        val words = t9Name.split("\\s+".toRegex())
+        for (word in words) {
+            if (word.startsWith(queryDigits)) return 100
+        }
+
+        // 3. Initials match (e.g. John Doe -> "53")
+        val initials = StringBuilder()
+        for (word in words) {
+            if (word.isNotEmpty()) initials.append(word.first())
+        }
+        if (initials.toString().startsWith(queryDigits)) return 85
+
+        // 4. Substring in name
+        if (t9Name.contains(queryDigits)) return 60
+
+        return 0
+    }
+
+    fun matchesT9(queryDigits: String, contactName: String): Boolean {
+        return matchScoreT9(queryDigits, contactName, "") > 0
     }
 }

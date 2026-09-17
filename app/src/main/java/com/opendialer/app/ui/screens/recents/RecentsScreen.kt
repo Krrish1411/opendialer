@@ -235,6 +235,20 @@ fun CallLogItem(
                         }
                     )
                     DropdownMenuItem(
+                        text = { Text("WhatsApp Chat") },
+                        onClick = {
+                            menuExpanded = false
+                            com.opendialer.app.core.telephony.SocialActionHelper.openWhatsAppChat(context, log.number)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Send SMS") },
+                        onClick = {
+                            menuExpanded = false
+                            com.opendialer.app.core.telephony.SocialActionHelper.sendSms(context, log.number)
+                        }
+                    )
+                    DropdownMenuItem(
                         text = { Text("Block number") },
                         onClick = {
                             menuExpanded = false

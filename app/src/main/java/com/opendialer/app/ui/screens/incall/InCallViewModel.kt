@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.opendialer.app.core.telephony.CallManager
 import com.opendialer.app.core.telephony.CurrentCallInfo
-import com.opendialer.app.core.telephony.DialerCallState
 import com.opendialer.app.data.repository.SettingsRepository
 import com.opendialer.app.services.CallRecorderService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,7 +24,6 @@ class InCallViewModel @Inject constructor(
     val callState: StateFlow<CurrentCallInfo> = callManager.callState
 
     init {
-        // Auto record check if user enabled it in settings
         viewModelScope.launch {
             val autoRecord = settingsRepository.autoRecordEnabled.first()
             val consent = settingsRepository.recordConsentAccepted.first()
@@ -36,18 +34,21 @@ class InCallViewModel @Inject constructor(
     }
 
     fun answer() = callManager.answer()
-
-    fun reject() = callManager.reject()
-
+    fun answerWithVideo() = callManager.answerWithVideo()
+    fun reject(rejectWithMessage: Boolean = false, text: String? = null) = callManager.reject(rejectWithMessage, text)
     fun disconnect() = callManager.disconnect()
-
     fun toggleMute() = callManager.toggleMute()
-
     fun toggleSpeaker() = callManager.toggleSpeaker()
-
+    fun setAudioRoute(route: Int) = callManager.setAudioRoute(route)
     fun toggleHold() = callManager.toggleHold()
-
     fun playDtmf(digit: Char) = callManager.playDtmf(digit)
+
+    // Call Waiting & Multi-Call
+    fun holdAndAnswer() = callManager.holdAndAnswer()
+    fun endAndAnswer() = callManager.endAndAnswer()
+    fun declineSecondCall() = callManager.declineSecondCall()
+    fun swap() = callManager.swap()
+    fun mergeConference() = callManager.mergeConference()
 
     fun toggleRecording(context: Context) {
         val current = callState.value

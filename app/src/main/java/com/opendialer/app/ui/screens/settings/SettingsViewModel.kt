@@ -3,9 +3,12 @@ package com.opendialer.app.ui.screens.settings
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.opendialer.app.core.common.PhoneNumberUtils
 import com.opendialer.app.core.designsystem.theme.ThemeId
 import com.opendialer.app.core.telephony.SimManager
 import com.opendialer.app.core.updater.OtaUpdateManager
+import com.opendialer.app.data.local.dao.BlockedNumberDao
+import com.opendialer.app.data.local.entity.BlockedNumberEntity
 import com.opendialer.app.data.model.BarringType
 import com.opendialer.app.data.model.ForwardingReason
 import com.opendialer.app.data.model.SimInfo
@@ -13,6 +16,8 @@ import com.opendialer.app.data.model.UpdateInfo
 import com.opendialer.app.data.repository.CallFeaturesRepository
 import com.opendialer.app.data.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -26,8 +31,11 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val simManager: SimManager,
     private val callFeaturesRepository: CallFeaturesRepository,
-    private val otaUpdateManager: OtaUpdateManager
+    private val otaUpdateManager: OtaUpdateManager,
+    private val blockedNumberDao: BlockedNumberDao
 ) : ViewModel() {
+
+    val blockedNumbers: Flow<List<BlockedNumberEntity>> = blockedNumberDao.getAllBlocked()
 
     val selectedTheme: StateFlow<ThemeId> = settingsRepository.selectedTheme
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ThemeId.AURA_MODERN)
@@ -178,6 +186,29 @@ class SettingsViewModel @Inject constructor(
                 _downloadProgress.value = progress
             }
             _downloadProgress.value = null
+        }
+    }
+
+    fun blockNumber(number: String, name: String? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val normalized = PhoneNumberUtils.normalize(number)
+            if (normalized.isNotEmpty()) {
+                blockedNumberDao.blockNumber(
+                    BlockedNumberEntity(
+                        normalizedNumber = normalized,
+                        callerName = name
+                    )
+                )
+            }
+        }
+    }
+
+    fun unblockNumber(number: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val normalized = PhoneNumberUtils.normalize(number)
+            if (normalized.isNotEmpty()) {
+                blockedNumberDao.unblockByNumber(normalized)
+            }
         }
     }
 }

@@ -1,5 +1,10 @@
 package com.opendialer.app.ui.screens.settings
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.telecom.TelecomManager
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,27 +18,29 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.ContactPhone
 import androidx.compose.material.icons.filled.DoNotDisturb
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhoneForwarded
 import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.Voicemail
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,12 +50,16 @@ import com.opendialer.app.BuildConfig
 fun SettingsScreen(
     onNavigateToThemes: () -> Unit,
     onNavigateToDualSim: () -> Unit,
+    onNavigateToSounds: () -> Unit,
+    onNavigateToBlockedNumbers: () -> Unit,
     onNavigateToRecording: () -> Unit,
     onNavigateToForwarding: () -> Unit,
     onNavigateToDnd: () -> Unit,
     onNavigateToUpdates: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -56,9 +67,10 @@ fun SettingsScreen(
         contentPadding = PaddingValues(vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // Section: Personalization & Themes
         item {
             Text(
-                text = "Preferences",
+                text = "Appearance & Interface",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -70,11 +82,33 @@ fun SettingsScreen(
             SettingsCategoryCard {
                 SettingsRowItem(
                     icon = Icons.Default.ColorLens,
-                    title = "Theme & Appearance",
-                    subtitle = "Aura Nebula, Pixel, OneUI, iOS, AMOLED Dark",
+                    title = "Theme & Deep OS Engine",
+                    subtitle = "Samsung One UI, iOS Cupertino, Pixel, Aura Nebula",
                     onClick = onNavigateToThemes
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SettingsRowItem(
+                    icon = Icons.Default.Vibration,
+                    title = "Sounds & Vibration",
+                    subtitle = "DTMF tones, haptic feedback, ringtones per SIM",
+                    onClick = onNavigateToSounds
+                )
+            }
+        }
+
+        // Section: Carrier & SIM Accounts
+        item {
+            Text(
+                text = "Calling & Carrier Accounts",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 8.dp, top = 12.dp, bottom = 4.dp)
+            )
+        }
+
+        item {
+            SettingsCategoryCard {
                 SettingsRowItem(
                     icon = Icons.Default.SimCard,
                     title = "Dual SIM Settings",
@@ -83,17 +117,43 @@ fun SettingsScreen(
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 SettingsRowItem(
-                    icon = Icons.Default.Mic,
-                    title = "Call Recording & Consent",
-                    subtitle = "Acoustic recording, speaker boost, and legal notice",
-                    onClick = onNavigateToRecording
+                    icon = Icons.Default.ContactPhone,
+                    title = "System Calling Accounts",
+                    subtitle = "Open Android carrier and SIP phone accounts",
+                    onClick = {
+                        try {
+                            val intent = Intent(TelecomManager.ACTION_CHANGE_PHONE_ACCOUNTS).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Cannot open calling accounts", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SettingsRowItem(
+                    icon = Icons.Default.Voicemail,
+                    title = "Voicemail Setup",
+                    subtitle = "Configure carrier voicemail number and quick dial (key 1)",
+                    onClick = {
+                        try {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("voicemail:")).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Voicemail not configured on carrier", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 )
             }
         }
 
+        // Section: Call Protection & Screening
         item {
             Text(
-                text = "Carrier & Telephony",
+                text = "Call Protection & Blocking",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -104,10 +164,10 @@ fun SettingsScreen(
         item {
             SettingsCategoryCard {
                 SettingsRowItem(
-                    icon = Icons.Default.PhoneForwarded,
-                    title = "Call Forwarding & Barring",
-                    subtitle = "Forward busy/unanswered, call barring, call waiting",
-                    onClick = onNavigateToForwarding
+                    icon = Icons.Default.Block,
+                    title = "Blocked Numbers",
+                    subtitle = "Manage auto-declined and spam telephone numbers",
+                    onClick = onNavigateToBlockedNumbers
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 SettingsRowItem(
@@ -116,12 +176,20 @@ fun SettingsScreen(
                     subtitle = "Silence unknown numbers, allow starred favorites",
                     onClick = onNavigateToDnd
                 )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SettingsRowItem(
+                    icon = Icons.Default.PhoneForwarded,
+                    title = "Call Forwarding & Barring",
+                    subtitle = "Forward busy/unanswered, call barring, call waiting (*43#)",
+                    onClick = onNavigateToForwarding
+                )
             }
         }
 
+        // Section: Call Recorder & OTA
         item {
             Text(
-                text = "Maintenance & Info",
+                text = "Recording & Updates",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -131,6 +199,13 @@ fun SettingsScreen(
 
         item {
             SettingsCategoryCard {
+                SettingsRowItem(
+                    icon = Icons.Default.Mic,
+                    title = "Call Recording & Boost",
+                    subtitle = "Acoustic recording, speaker boost, and storage",
+                    onClick = onNavigateToRecording
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 SettingsRowItem(
                     icon = Icons.Default.SystemUpdate,
                     title = "Check for Updates (OTA)",
@@ -141,7 +216,7 @@ fun SettingsScreen(
                 SettingsRowItem(
                     icon = Icons.Default.Info,
                     title = "About OpenDialer",
-                    subtitle = "Version 1.0.0 • Open-Source Personal Dialer",
+                    subtitle = "Version ${BuildConfig.VERSION_NAME} • Open-Source Personal Dialer",
                     onClick = {}
                 )
             }
