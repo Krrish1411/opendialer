@@ -64,14 +64,14 @@ class CallManager @Inject constructor(
         override fun onStateChanged(call: Call, state: Int) {
             updateFromCall(call)
         }
+    }
 
-        override fun onCallAudioStateChanged(call: Call, audioState: CallAudioState) {
-            val isSpeaker = audioState.route == CallAudioState.ROUTE_SPEAKER
-            _callState.value = _callState.value.copy(
-                isMuted = audioState.isMuted,
-                isSpeakerOn = isSpeaker
-            )
-        }
+    fun onCallAudioStateChanged(audioState: CallAudioState) {
+        val isSpeaker = audioState.route == CallAudioState.ROUTE_SPEAKER
+        _callState.value = _callState.value.copy(
+            isMuted = audioState.isMuted,
+            isSpeakerOn = isSpeaker
+        )
     }
 
     fun onCallAdded(call: Call) {

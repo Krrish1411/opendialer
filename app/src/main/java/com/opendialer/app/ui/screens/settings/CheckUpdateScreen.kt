@@ -62,7 +62,7 @@ fun CheckUpdateScreen(
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterVertically
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Icon(
                         imageVector = Icons.Default.SystemUpdate,

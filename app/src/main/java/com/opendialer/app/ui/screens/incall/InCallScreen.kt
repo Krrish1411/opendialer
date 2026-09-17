@@ -78,12 +78,12 @@ fun InCallScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp, vertical = 40.dp),
-            horizontalAlignment = Alignment.CenterVertically,
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             // Top Section: Caller Info
             Column(
-                horizontalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(top = 20.dp)
             ) {
                 Box(
@@ -147,7 +147,7 @@ fun InCallScreen(
             if (callState.state == DialerCallState.ACTIVE || callState.state == DialerCallState.ON_HOLD) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterVertically
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     WaveformVisualizer(
                         isRecording = callState.isRecording,
@@ -279,7 +279,7 @@ fun InCallControlButton(
     onClick: () -> Unit
 ) {
     Column(
-        horizontalAlignment = Alignment.CenterVertically,
+        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.clickable { onClick() }
     ) {
         Box(

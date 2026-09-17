@@ -78,6 +78,11 @@ class DialerInCallService : InCallService() {
         }
     }
 
+    override fun onCallAudioStateChanged(audioState: android.telecom.CallAudioState) {
+        super.onCallAudioStateChanged(audioState)
+        callManager.onCallAudioStateChanged(audioState)
+    }
+
     override fun onCallRemoved(call: Call) {
         super.onCallRemoved(call)
         callManager.onCallRemoved(call)
