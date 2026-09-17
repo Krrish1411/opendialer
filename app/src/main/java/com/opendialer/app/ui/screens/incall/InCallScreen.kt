@@ -73,6 +73,8 @@ import com.opendialer.app.core.designsystem.components.WaveformVisualizer
 import com.opendialer.app.core.designsystem.theme.LocalThemePack
 import com.opendialer.app.core.designsystem.theme.ThemeId
 import com.opendialer.app.core.telephony.DialerCallState
+import com.opendialer.app.ui.screens.incall.components.ModernSlideToAnswer
+import com.opendialer.app.ui.screens.incall.components.PulsingRipplesAvatar
 import com.opendialer.app.ui.screens.keypad.DialpadGrid
 
 @Composable
@@ -218,19 +220,26 @@ fun InCallScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(top = 10.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .then(
-                            if (callState.state == DialerCallState.INCOMING) Modifier.scale(pulseScale)
-                            else Modifier
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    ContactAvatar(
-                        name = callState.displayName.ifEmpty { "Unknown" },
-                        photoUri = null,
-                        size = if (showDtmfKeypad) 64.dp else 104.dp
-                    )
+                if (callState.state == DialerCallState.INCOMING) {
+                    PulsingRipplesAvatar {
+                        ContactAvatar(
+                            name = callState.displayName.ifEmpty { "Unknown" },
+                            photoUri = null,
+                            size = 108.dp
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        ContactAvatar(
+                            name = callState.displayName.ifEmpty { "Unknown" },
+                            photoUri = null,
+                            size = if (showDtmfKeypad) 64.dp else 104.dp
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -379,56 +388,23 @@ fun InCallScreen(
             // 5. Bottom Section: Answer / Reject / Disconnect
             if (callState.state == DialerCallState.INCOMING) {
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Reject Button (Red)
-                        Box(
-                            modifier = Modifier
-                                .size(72.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFDC2626))
-                                .clickable { viewModel.reject() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CallEnd,
-                                contentDescription = "Reject Call",
-                                tint = Color.White,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
+                    ModernSlideToAnswer(
+                        onAnswer = { viewModel.answer() },
+                        onDecline = { viewModel.reject() }
+                    )
 
-                        // Answer Button (Green)
-                        Box(
-                            modifier = Modifier
-                                .size(72.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF16A34A))
-                                .clickable { viewModel.answer() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Call,
-                                contentDescription = "Answer Call",
-                                tint = Color.White,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                    }
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     // Quick SMS Reject
                     AssistChip(
                         onClick = { viewModel.reject(rejectWithMessage = true, text = "Can't talk right now. I'll call you back.") },
-                        label = { Text("Reply with SMS", fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f)) },
-                        colors = AssistChipDefaults.assistChipColors(containerColor = Color.White.copy(alpha = 0.15f))
+                        label = { Text("Reply with SMS", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f)) },
+                        colors = AssistChipDefaults.assistChipColors(containerColor = Color.White.copy(alpha = 0.12f))
                     )
                 }
             } else {

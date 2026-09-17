@@ -62,22 +62,13 @@ fun ContactsScreen(
     val context = LocalContext.current
 
     var selectedContactForDetail by remember { mutableStateOf<ContactUiModel?>(null) }
+    var showCreateContactEditor by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         floatingActionButton = {
             FloatingActionButton(
-                onClick = {
-                    try {
-                        val intent = Intent(Intent.ACTION_INSERT).apply {
-                            type = ContactsContract.RawContacts.CONTENT_TYPE
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                        }
-                        context.startActivity(intent)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                },
+                onClick = { showCreateContactEditor = true },
                 containerColor = MaterialTheme.colorScheme.primary,
                 shape = CircleShape
             ) {
@@ -160,20 +151,32 @@ fun ContactsScreen(
     selectedContactForDetail?.let { contact ->
         ContactDetailSheet(
             contact = contact,
+            contactsRepository = viewModel.repository,
             onDismiss = { selectedContactForDetail = null },
             onCallVoice = { slotIndex ->
                 viewModel.placeCall(context, contact)
             },
             onCallCarrierVideo = {
-                // ViLTE video call via SimManager
-                viewModel.placeCall(context, contact)
+                viewModel.placeVideoCall(context, contact)
             },
             onToggleFavorite = {
                 viewModel.toggleFavorite(contact)
             },
             onBlockContact = {
                 // Block contact
+            },
+            onContactChanged = {
+                viewModel.loadContacts()
             }
+        )
+    }
+
+    if (showCreateContactEditor) {
+        ContactEditorSheet(
+            contact = null,
+            contactsRepository = viewModel.repository,
+            onDismiss = { showCreateContactEditor = false },
+            onSaved = { viewModel.loadContacts() }
         )
     }
 }

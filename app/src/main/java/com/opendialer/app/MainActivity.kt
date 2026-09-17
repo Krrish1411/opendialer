@@ -24,6 +24,8 @@ import com.opendialer.app.ui.screens.incall.InCallViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
+import androidx.activity.enableEdgeToEdge
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
@@ -39,6 +41,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
         super.onCreate(savedInstanceState)
 
         requestRequiredPermissions()

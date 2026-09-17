@@ -23,6 +23,8 @@ class ContactsViewModel @Inject constructor(
     private val simManager: SimManager
 ) : ViewModel() {
 
+    val repository: ContactsRepository get() = contactsRepository
+
     private val _contacts = MutableStateFlow<List<ContactUiModel>>(emptyList())
     val contacts: StateFlow<List<ContactUiModel>> = _contacts.asStateFlow()
 
@@ -85,5 +87,9 @@ class ContactsViewModel @Inject constructor(
                 context.startActivity(dialIntent)
             }
         }
+    }
+
+    fun placeVideoCall(context: Context, contact: ContactUiModel) {
+        simManager.placeCall(context, contact.phoneNumber, isVideoCall = true)
     }
 }

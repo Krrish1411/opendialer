@@ -144,4 +144,118 @@ class ContactsRepository @Inject constructor(
         }
         null
     }
+
+    suspend fun updateContact(
+        contactId: Long,
+        displayName: String,
+        phoneNumber: String,
+        email: String? = null,
+        customRingtone: String? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val ops = ArrayList<android.content.ContentProviderOperation>()
+
+            // 1. Update Display Name
+            ops.add(
+                android.content.ContentProviderOperation.newUpdate(ContactsContract.Data.CONTENT_URI)
+                    .withSelection(
+                        "${ContactsContract.Data.CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} = ?",
+                        arrayOf(contactId.toString(), ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+                    )
+                    .withValue(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, displayName)
+                    .build()
+            )
+
+            // 2. Update Phone Number
+            ops.add(
+                android.content.ContentProviderOperation.newUpdate(ContactsContract.Data.CONTENT_URI)
+                    .withSelection(
+                        "${ContactsContract.Data.CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} = ?",
+                        arrayOf(contactId.toString(), ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                    )
+                    .withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, phoneNumber)
+                    .build()
+            )
+
+            // 3. Update Custom Ringtone if provided
+            if (customRingtone != null) {
+                val contactUri = android.content.ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contactId)
+                val values = android.content.ContentValues().apply {
+                    put(ContactsContract.Contacts.CUSTOM_RINGTONE, customRingtone)
+                }
+                context.contentResolver.update(contactUri, values, null, null)
+            }
+
+            context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
+            com.opendialer.app.core.telephony.ContactLookupHelper.clearCache()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun deleteContact(contactId: Long): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val uri = android.content.ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contactId)
+            val rows = context.contentResolver.delete(uri, null, null)
+            com.opendialer.app.core.telephony.ContactLookupHelper.clearCache()
+            rows > 0
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun createContact(
+        displayName: String,
+        phoneNumber: String,
+        email: String? = null,
+        customRingtone: String? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val ops = ArrayList<android.content.ContentProviderOperation>()
+
+            ops.add(
+                android.content.ContentProviderOperation.newInsert(ContactsContract.RawContacts.CONTENT_URI)
+                    .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null)
+                    .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null)
+                    .build()
+            )
+
+            ops.add(
+                android.content.ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                    .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
+                    .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+                    .withValue(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, displayName)
+                    .build()
+            )
+
+            ops.add(
+                android.content.ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                    .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
+                    .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                    .withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, phoneNumber)
+                    .withValue(ContactsContract.CommonDataKinds.Phone.TYPE, ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE)
+                    .build()
+            )
+
+            if (!email.isNullOrBlank()) {
+                ops.add(
+                    android.content.ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                        .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
+                        .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE)
+                        .withValue(ContactsContract.CommonDataKinds.Email.ADDRESS, email)
+                        .withValue(ContactsContract.CommonDataKinds.Email.TYPE, ContactsContract.CommonDataKinds.Email.TYPE_HOME)
+                        .build()
+                )
+            }
+
+            val results = context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
+            com.opendialer.app.core.telephony.ContactLookupHelper.clearCache()
+            results.isNotEmpty()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
 }

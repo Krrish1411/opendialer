@@ -16,12 +16,18 @@ import com.opendialer.app.core.telephony.DialerCallState
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
+import androidx.activity.enableEdgeToEdge
+
 @AndroidEntryPoint
 class IncomingCallActivity : ComponentActivity() {
 
     private val viewModel: InCallViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
         super.onCreate(savedInstanceState)
         configureLockScreenFlags()
 

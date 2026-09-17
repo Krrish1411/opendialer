@@ -100,33 +100,44 @@ class CallRecorderService : Service() {
                 }
             }
 
-            val engine = capabilityChecker.getRecommendedEngine()
-            val audioSource = if (engine == RecorderEngineType.SYSTEM_VOICE_CALL) {
-                MediaRecorder.AudioSource.VOICE_CALL
-            } else {
-                MediaRecorder.AudioSource.MIC
+            val audioSource = MediaRecorder.AudioSource.VOICE_COMMUNICATION
+
+            fun createRecorder(source: Int): MediaRecorder {
+                return (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    MediaRecorder(this@CallRecorderService)
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaRecorder()
+                }).apply {
+                    setAudioSource(source)
+                    setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                    setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                    setAudioEncodingBitRate(128000)
+                    setAudioSamplingRate(44100)
+                    setOutputFile(recordingFile?.absolutePath)
+                    prepare()
+                }
             }
 
-            mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                MediaRecorder(this)
-            } else {
-                @Suppress("DEPRECATION")
-                MediaRecorder()
-            }.apply {
-                setAudioSource(audioSource)
-                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                setAudioEncodingBitRate(128000)
-                setAudioSamplingRate(44100)
-                setOutputFile(recordingFile?.absolutePath)
-                prepare()
-                start()
+            mediaRecorder = try {
+                createRecorder(audioSource)
+            } catch (_: Exception) {
+                createRecorder(MediaRecorder.AudioSource.MIC)
             }
+            mediaRecorder?.start()
 
             recordStartTime = System.currentTimeMillis()
             callManager.setRecording(true)
 
-            startForeground(Constants.NOTIFICATION_ID_RECORDER, buildRecordingNotification())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    Constants.NOTIFICATION_ID_RECORDER,
+                    buildRecordingNotification(),
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
+            } else {
+                startForeground(Constants.NOTIFICATION_ID_RECORDER, buildRecordingNotification())
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             stopRecording()
@@ -136,7 +147,11 @@ class CallRecorderService : Service() {
     private fun stopRecording() {
         try {
             mediaRecorder?.apply {
-                stop()
+                try {
+                    stop()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 release()
             }
         } catch (e: Exception) {
@@ -154,21 +169,25 @@ class CallRecorderService : Service() {
         val durationSec = if (recordStartTime > 0) (System.currentTimeMillis() - recordStartTime) / 1000 else 0
         val recordedFile = recordingFile
 
-        if (recordedFile != null && recordedFile.exists() && recordedFile.length() > 0) {
-            serviceScope.launch {
-                recordingRepository.saveRecording(
-                    filePath = recordedFile.absolutePath,
-                    contactName = currentName,
-                    phoneNumber = currentNumber,
-                    durationSeconds = durationSec,
-                    simLabel = "SIM 1",
-                    sizeBytes = recordedFile.length()
-                )
+        serviceScope.launch {
+            try {
+                if (recordedFile != null && recordedFile.exists() && recordedFile.length() > 0) {
+                    recordingRepository.saveRecording(
+                        filePath = recordedFile.absolutePath,
+                        contactName = currentName,
+                        phoneNumber = currentNumber,
+                        durationSeconds = durationSec,
+                        simLabel = "SIM 1",
+                        sizeBytes = recordedFile.length()
+                    )
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
             }
         }
-
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
     }
 
     private fun buildRecordingNotification(): Notification {

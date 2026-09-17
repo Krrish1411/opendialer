@@ -4,10 +4,13 @@ import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -163,7 +166,7 @@ fun KeypadScreen(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                if (inputNumber.isNotEmpty()) {
+                if (inputNumber.isNotEmpty() && !isIos) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
@@ -255,88 +258,179 @@ fun KeypadScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Call Action Buttons (Adapts to Samsung One UI vs standard)
-        if (isOneUi && activeSims.size > 1) {
-            // Samsung One UI style: Side-by-Side SIM 1 and SIM 2 Call Buttons!
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                activeSims.take(2).forEachIndexed { idx, sim ->
-                    Button(
-                        onClick = {
-                            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                            viewModel.placeCall(context, simSlotIndex = sim.slotIndex)
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp),
-                        shape = RoundedCornerShape(28.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (idx == 0) Color(0xFF16A34A) else Color(0xFF2563EB)
-                        )
-                    ) {
-                        Icon(Icons.Default.Call, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = sim.displayName,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
+        // Call Action Buttons (Adapts to Samsung One UI vs iOS vs Aura vs standard)
+        when {
+            isOneUi && activeSims.size > 1 -> {
+                // Samsung One UI style: Side-by-Side SIM 1 and SIM 2 Call Buttons
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    activeSims.take(2).forEachIndexed { idx, sim ->
+                        Button(
+                            onClick = {
+                                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                viewModel.placeCall(context, simSlotIndex = sim.slotIndex)
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp),
+                            shape = RoundedCornerShape(28.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (idx == 0) Color(0xFF16A34A) else Color(0xFF2563EB)
+                            )
+                        ) {
+                            Icon(Icons.Default.Call, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = sim.displayName,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
                     }
                 }
             }
-        } else {
-            // Standard / iOS / Pixel / Aura Call Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 6.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // ViLTE Carrier Video Call Button (if typed digits)
-                if (inputNumber.isNotEmpty()) {
-                    IconButton(
-                        onClick = {
-                            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                            viewModel.placeCarrierVideoCall(context)
-                        },
+            isIos -> {
+                // iOS Phone style: Centered Apple Green Circular Call Button + Bottom-Right Backspace
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Left slot: Carrier ViLTE Video Call or Spacer
+                    if (inputNumber.isNotEmpty()) {
+                        IconButton(
+                            onClick = {
+                                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                viewModel.placeCarrierVideoCall(context)
+                            },
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Videocam,
+                                contentDescription = "Carrier Video Call",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.size(56.dp))
+                    }
+
+                    // Center: iOS Green Circle Call Button
+                    Box(
                         modifier = Modifier
-                            .size(52.dp)
+                            .size(76.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .background(Color(0xFF34C759))
+                            .clickable {
+                                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                viewModel.placeCall(context)
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Videocam,
-                            contentDescription = "Carrier Video Call",
-                            tint = MaterialTheme.colorScheme.primary
+                            imageVector = Icons.Default.Call,
+                            contentDescription = "Call",
+                            tint = Color.White,
+                            modifier = Modifier.size(36.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(24.dp))
-                }
 
-                // Primary Voice Call Button
-                Box(
+                    // Right slot: Native iOS Backspace
+                    if (inputNumber.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .combinedClickable(
+                                    onClick = {
+                                        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                                        viewModel.deleteLastDigit()
+                                    },
+                                    onLongClick = {
+                                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                        viewModel.clear()
+                                    }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Backspace,
+                                contentDescription = "Backspace",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.size(56.dp))
+                    }
+                }
+            }
+            else -> {
+                // Aura Modern / Pixel / AMOLED / Classic Call Bar
+                Row(
                     modifier = Modifier
-                        .size(68.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF16A34A))
-                        .clickable {
-                            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                            viewModel.placeCall(context)
-                        },
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Call,
-                        contentDescription = "Call",
-                        tint = Color.White,
-                        modifier = Modifier.size(34.dp)
-                    )
+                    if (inputNumber.isNotEmpty()) {
+                        IconButton(
+                            onClick = {
+                                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                viewModel.placeCarrierVideoCall(context)
+                            },
+                            modifier = Modifier
+                                .size(54.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Videocam,
+                                contentDescription = "Carrier Video Call",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(24.dp))
+                    }
+
+                    val callShape = when (themePack.id) {
+                        ThemeId.AURA_MODERN -> RoundedCornerShape(24.dp)
+                        ThemeId.AMOLED_DARK -> RoundedCornerShape(20.dp)
+                        else -> CircleShape
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(callShape)
+                            .background(
+                                if (themePack.id == ThemeId.AMOLED_DARK) Color(0xFF00E5FF)
+                                else Color(0xFF16A34A)
+                            )
+                            .clickable {
+                                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                viewModel.placeCall(context)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Call,
+                            contentDescription = "Call",
+                            tint = if (themePack.id == ThemeId.AMOLED_DARK) Color.Black else Color.White,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
                 }
             }
         }
@@ -481,36 +575,94 @@ fun DialpadButton(
     onLongClick: () -> Unit
 ) {
     val themePack = LocalThemePack.current
-    val isIos = themePack.id == ThemeId.IOS
+    val isDark = isSystemInDarkTheme()
+
+    val shape = when (themePack.id) {
+        ThemeId.IOS -> CircleShape
+        ThemeId.ONE_UI -> RoundedCornerShape(26.dp)
+        ThemeId.AURA_MODERN -> RoundedCornerShape(22.dp)
+        ThemeId.AMOLED_DARK -> RoundedCornerShape(18.dp)
+        ThemeId.PIXEL -> CircleShape
+        ThemeId.CLASSIC -> RoundedCornerShape(8.dp)
+    }
+
+    val size = when (themePack.id) {
+        ThemeId.IOS -> 76.dp
+        ThemeId.ONE_UI -> 72.dp
+        ThemeId.AURA_MODERN -> 72.dp
+        ThemeId.AMOLED_DARK -> 70.dp
+        ThemeId.PIXEL -> 70.dp
+        ThemeId.CLASSIC -> 68.dp
+    }
+
+    val containerColor = when (themePack.id) {
+        ThemeId.IOS -> if (isDark) Color(0xFF2C2C2E) else Color(0xFFE5E5EA)
+        ThemeId.ONE_UI -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+        ThemeId.AURA_MODERN -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+        ThemeId.AMOLED_DARK -> Color(0xFF0D0D0D)
+        ThemeId.PIXEL -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+        ThemeId.CLASSIC -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+    }
+
+    val borderStroke = when (themePack.id) {
+        ThemeId.AURA_MODERN -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+        ThemeId.AMOLED_DARK -> BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.35f))
+        else -> null
+    }
+
+    val digitFontSize = when (themePack.id) {
+        ThemeId.IOS -> 32.sp
+        ThemeId.ONE_UI -> 28.sp
+        ThemeId.AURA_MODERN -> 28.sp
+        else -> 26.sp
+    }
+
+    val digitFontWeight = when (themePack.id) {
+        ThemeId.IOS -> FontWeight.Normal
+        ThemeId.ONE_UI -> FontWeight.Bold
+        ThemeId.AURA_MODERN -> FontWeight.Bold
+        else -> FontWeight.SemiBold
+    }
+
+    val subTextColor = when (themePack.id) {
+        ThemeId.AURA_MODERN -> MaterialTheme.colorScheme.primary
+        ThemeId.AMOLED_DARK -> Color(0xFF00E5FF)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    var boxModifier = Modifier
+        .size(size)
+        .clip(shape)
+
+    if (borderStroke != null) {
+        boxModifier = boxModifier.border(borderStroke, shape)
+    }
+
+    boxModifier = boxModifier
+        .background(containerColor)
+        .combinedClickable(
+            onClick = onClick,
+            onLongClick = onLongClick
+        )
 
     Box(
-        modifier = Modifier
-            .size(68.dp)
-            .clip(CircleShape)
-            .background(
-                if (isIos) Color(0xFFE5E5EA).copy(alpha = 0.6f)
-                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            )
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            ),
+        modifier = boxModifier,
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = digit.toString(),
-                fontSize = 24.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontSize = digitFontSize,
+                fontWeight = digitFontWeight,
                 color = MaterialTheme.colorScheme.onSurface
             )
             if (subText.isNotEmpty()) {
                 Text(
                     text = subText,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    letterSpacing = 1.sp
+                    fontSize = if (themePack.id == ThemeId.IOS) 10.sp else 9.sp,
+                    fontWeight = if (themePack.id == ThemeId.IOS) FontWeight.Bold else FontWeight.Medium,
+                    color = subTextColor,
+                    letterSpacing = if (themePack.id == ThemeId.IOS) 2.sp else 1.2.sp
                 )
             }
         }

@@ -131,20 +131,34 @@ class SimManager @Inject constructor(
             activeSims.firstOrNull()
         }
 
+        val uri = Uri.parse("tel:" + Uri.encode(cleanNumber))
+        val extras = android.os.Bundle().apply {
+            if (chosenSim?.phoneAccountHandle != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, chosenSim.phoneAccountHandle)
+            }
+            if (isVideoCall && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                putInt(TelecomManager.EXTRA_START_CALL_WITH_VIDEO_STATE, VideoProfile.STATE_BIDIRECTIONAL)
+            }
+        }
+
+        // 1. Direct Telecom API (guarantees ViLTE video state on Android 10-14 / Jio / Airtel)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && telecomManager != null &&
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                telecomManager.placeCall(uri, extras)
+                return
+            } catch (_: Exception) {}
+        }
+
+        // 2. Intent ACTION_CALL fallback
         try {
-            val uri = Uri.parse("tel:" + Uri.encode(cleanNumber))
             val intent = Intent(Intent.ACTION_CALL, uri).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                if (chosenSim?.phoneAccountHandle != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    putExtra(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, chosenSim.phoneAccountHandle)
-                }
-                if (isVideoCall && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    putExtra(TelecomManager.EXTRA_START_CALL_WITH_VIDEO_STATE, VideoProfile.STATE_BIDIRECTIONAL)
-                }
+                putExtras(extras)
             }
             context.startActivity(intent)
         } catch (e: Exception) {
-            val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(cleanNumber))).apply {
+            val dialIntent = Intent(Intent.ACTION_DIAL, uri).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(dialIntent)

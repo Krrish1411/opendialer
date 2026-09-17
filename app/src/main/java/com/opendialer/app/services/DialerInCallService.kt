@@ -34,7 +34,8 @@ class DialerInCallService : InCallService() {
         callManager.onCallAdded(call)
 
         val number = call.details?.handle?.schemeSpecificPart ?: "Unknown"
-        val callerName = call.details?.callerDisplayName ?: number
+        val resolved = com.opendialer.app.core.telephony.ContactLookupHelper.resolveCaller(this, number, call.details?.callerDisplayName)
+        val callerName = resolved.displayName
 
         val isOutgoing = call.state == Call.STATE_DIALING || call.state == Call.STATE_CONNECTING
         val isIncoming = call.state == Call.STATE_RINGING
@@ -49,6 +50,11 @@ class DialerInCallService : InCallService() {
             fullScreenIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+
+        val callerPerson = androidx.core.app.Person.Builder()
+            .setName(callerName)
+            .setImportant(true)
+            .build()
 
         if (isIncoming) {
             // PendingIntents for Notification Action Buttons
@@ -66,7 +72,14 @@ class DialerInCallService : InCallService() {
                 this, 102, declineIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
+            val callStyle = NotificationCompat.CallStyle.forIncomingCall(
+                callerPerson,
+                pendingDecline,
+                pendingAnswer
+            )
+
             val notification = NotificationCompat.Builder(this, DialerApplication.CHANNEL_INCALL)
+                .setStyle(callStyle)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(callerName)
                 .setContentText("Incoming call ($number)")
@@ -76,17 +89,14 @@ class DialerInCallService : InCallService() {
                 .setContentIntent(pendingFullScreen)
                 .setOngoing(true)
                 .setAutoCancel(false)
-                .addAction(android.R.drawable.ic_menu_call, "Answer", pendingAnswer)
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", pendingDecline)
                 .build()
 
             startInCallForeground(Constants.NOTIFICATION_ID_INCALL, notification)
 
-            // If phone screen is off / locked, wake device immediately to show full screen
-            val isInteractive = powerManager?.isInteractive ?: false
-            if (!isInteractive) {
+            // Open incoming call full-screen immediately
+            try {
                 startActivity(fullScreenIntent)
-            }
+            } catch (_: Exception) {}
         } else {
             // Outgoing / Active Call Notification
             val disconnectIntent = Intent(this, CallActionReceiver::class.java).apply {
@@ -103,7 +113,13 @@ class DialerInCallService : InCallService() {
                 this, 104, toggleMuteIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
+            val callStyle = NotificationCompat.CallStyle.forOngoingCall(
+                callerPerson,
+                pendingDisconnect
+            )
+
             val notification = NotificationCompat.Builder(this, DialerApplication.CHANNEL_INCALL)
+                .setStyle(callStyle)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(callerName)
                 .setContentText(if (isOutgoing) "Calling..." else "Ongoing Call ($number)")
@@ -111,14 +127,15 @@ class DialerInCallService : InCallService() {
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setOngoing(true)
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "End Call", pendingDisconnect)
                 .addAction(android.R.drawable.ic_lock_silent_mode, "Mute", pendingMute)
                 .build()
 
             startInCallForeground(Constants.NOTIFICATION_ID_INCALL, notification)
 
             // For outgoing calls, open in-call screen immediately
-            startActivity(fullScreenIntent)
+            try {
+                startActivity(fullScreenIntent)
+            } catch (_: Exception) {}
         }
     }
 

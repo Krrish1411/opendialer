@@ -102,6 +102,19 @@ class CallManager @Inject constructor(
         if (calls.isEmpty()) {
             handler.removeCallbacks(timerRunnable)
             callStartTime = 0
+
+            // Ensure any active recording is properly stopped and saved
+            if (_callState.value.isRecording) {
+                try {
+                    val stopIntent = android.content.Intent(context, com.opendialer.app.services.CallRecorderService::class.java).apply {
+                        action = com.opendialer.app.services.CallRecorderService.ACTION_STOP
+                    }
+                    context.startService(stopIntent)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
             _callState.value = CurrentCallInfo(state = DialerCallState.DISCONNECTED)
             handler.postDelayed({
                 if (calls.isEmpty()) {
@@ -150,7 +163,8 @@ class CallManager @Inject constructor(
         }
 
         val number = primary.details?.handle?.schemeSpecificPart ?: ""
-        val callerName = primary.details?.callerDisplayName ?: ""
+        val resolvedCaller = ContactLookupHelper.resolveCaller(context, number, primary.details?.callerDisplayName)
+        val callerName = resolvedCaller.displayName
         val isConference = primary.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) == true
 
         val newState = when (primary.state) {
@@ -183,15 +197,19 @@ class CallManager @Inject constructor(
         val waiting = getWaitingCall()
 
         val secondaryNum = holding?.details?.handle?.schemeSpecificPart ?: ""
-        val secondaryName = holding?.details?.callerDisplayName ?: secondaryNum
+        val secondaryName = if (holding != null) {
+            ContactLookupHelper.resolveCaller(context, secondaryNum, holding.details?.callerDisplayName).displayName
+        } else secondaryNum
 
         val waitingNum = waiting?.details?.handle?.schemeSpecificPart ?: ""
-        val waitingName = waiting?.details?.callerDisplayName ?: waitingNum
+        val waitingName = if (waiting != null) {
+            ContactLookupHelper.resolveCaller(context, waitingNum, waiting.details?.callerDisplayName).displayName
+        } else waitingNum
 
         _callState.value = _callState.value.copy(
             state = newState,
             phoneNumber = number,
-            displayName = callerName.ifEmpty { number },
+            displayName = callerName,
             isHeld = primary.state == Call.STATE_HOLDING,
             isVideoCapable = canVideo,
             isVideoCall = isVideo,
